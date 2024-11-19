@@ -58,32 +58,89 @@ class DV360DataFetcher:
     def create_query(self, advertiser_id):
         """Create a DV360 report query with correct v2 format"""
         try:
-            query_body = {
+            # query_body = {
+            #     "metadata": {
+            #         "title": f"DV360 Report {datetime.now().strftime('%Y%m%d')}",
+            #         "dataRange": "LAST_30_DAYS",  # Adjust to a supported range as needed
+            #         "format": "CSV"
+            #     },
+            #     "params": {
+            #         "metrics": [
+            #             "impressions",
+            #             "clicks",
+            #             "totalMediaCostAdvertiser",
+            #             "totalConversions"
+            #         ],
+            #         "groupBys": [
+            #             "date",
+            #             "advertiser",
+            #             "insertionOrder",
+            #             "lineItem",
+            #             "creativeId"
+            #         ]
+            #     }
+            # }
+
+            display_name = 'DV 360 Report for testing.'
+
+            # Advertiser ID and campaign ID by which to filter report data.
+            advertiser_id = advertiser_id
+            campaign_id = '55089520'
+
+            # Build query object with basic dimension and metrics values.
+            query_obj = {
                 "metadata": {
-                    "title": f"DV360 Report {datetime.now().strftime('%Y%m%d')}",
-                    "dataRange": "LAST_30_DAYS",  # Adjust to a supported range as needed
-                    "format": "CSV"
+                    "title": display_name,
+                    "dataRange": {"range": "LAST_7_DAYS"},
+                    "format": "CSV",
                 },
                 "params": {
-                    "metrics": [
-                        "impressions",
-                        "clicks",
-                        "totalMediaCostAdvertiser",
-                        "totalConversions"
-                    ],
+                    "type": "STANDARD",
                     "groupBys": [
-                        "date",
-                        "advertiser",
-                        "insertionOrder",
-                        "lineItem",
-                        "creativeId"
-                    ]
-                }
+                        "FILTER_ADVERTISER_NAME",
+                        "FILTER_ADVERTISER",
+                        "FILTER_ADVERTISER_CURRENCY",
+                        "FILTER_INSERTION_ORDER_NAME",
+                        "FILTER_INSERTION_ORDER",
+                        "FILTER_LINE_ITEM_NAME",
+                        "FILTER_LINE_ITEM",
+                    ],
+                    "filters": [
+                        {"type": "FILTER_ADVERTISER", "value": advertiser_id},
+                        {"type": "FILTER_MEDIA_PLAN", "value": campaign_id}
+
+                    ],
+                    "metrics": [
+                        "METRIC_IMPRESSIONS",
+                        "METRIC_BILLABLE_IMPRESSIONS",
+                        "METRIC_CLICKS",
+                        "METRIC_CTR",
+                        "METRIC_TOTAL_CONVERSIONS",
+                        "METRIC_LAST_CLICKS",
+                        "METRIC_LAST_IMPRESSIONS",
+                        "METRIC_REVENUE_ADVERTISER",
+                        "METRIC_MEDIA_COST_ADVERTISER",
+                    ],
+                },
+                "schedule": {"frequency": "ONE_TIME"}
             }
 
-            print("Creating query with body:", query_body)
-            response = self.dbm_service.queries().create(body=query_body).execute()
+            # Create query object.
+            #query_response = service.queries().create(body=query_obj).execute()
+
+            # Print new query ID.
+            #print(f'Query {query_response["queryId"]} was created.')
+
+            print("Creating query with body:", query_obj)
+            response = self.dbm_service.queries().create(body=query_obj).execute()
             print("Query response:", response)
+
+            queryId = response.get('queryId')
+            query = self.dbm_service.queries().get(queryId=queryId).execute()
+            print(
+                f'Query ID {queryId} retrieved with display name'
+                f' {query["metadata"]["title"]}.'
+            )
             return response.get('queryId')
 
         except HttpError as e:
@@ -122,6 +179,7 @@ class DV360DataFetcher:
         """Get report data"""
         try:
             print("Retrieving report data...")
+            print('Query id in report data->',query_id)
             response = self.dbm_service.queries().reports().list(queryId=query_id).execute()
             
             if not response.get('reports'):
@@ -203,7 +261,7 @@ def main():
     # Configuration
     CREDENTIALS_PATH = 'client_secret_810072076887-2utceqsi8e6cnr27jd8v8vcd54ec5tnq.apps.googleusercontent.com.json'  # Update with your credentials file path
     SPREADSHEET_ID = '1eEHlLDG2eSMvQphWjFyvFJ9q1XoyajTs5adrTJzyG4k'  # Update with your spreadsheet ID
-    ADVERTISER_ID = '6584048598'  # Your advertiser ID
+    ADVERTISER_ID = '6783985134'  # Your advertiser ID
     SHEET_NAME = 'PA DV360'  # Name of the sheet to update
 
     # Initialize fetcher
@@ -233,8 +291,7 @@ def main():
 
     # Get report data
     print("\nFetching report data...")
-    data = fetcher.get_rep
+    data = fetcher.get_report_data(query_id)
     
 if __name__ == '__main__':
     main()
-
