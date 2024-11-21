@@ -8,6 +8,7 @@ import pandas as pd
 import time
 from datetime import datetime
 import pickle
+import requests
 
 class DV360DataFetcher:
     def __init__(self, credentials_path):
@@ -159,7 +160,8 @@ class DV360DataFetcher:
             try:
                 print(f"Checking report status (Attempt {attempts + 1}/{max_attempts})")
                 query = self.dbm_service.queries().get(queryId=query_id).execute()
-                
+                # reportId = query.get('reportId')
+                # print('report id==>',reportId)
                 if not query.get('metadata', {}).get('running', False):
                     print("Report generation completed")
                     return True
@@ -175,27 +177,84 @@ class DV360DataFetcher:
         print("Report generation timed out")
         return False
 
-    def get_report_data(self, query_id):
-        """Get report data"""
+    # def get_report_data(self, query_id):
+    #     """Get report data"""
+    #     try:
+    #         print("Retrieving report data...")
+    #         print('Query id in report data->',query_id)
+    #         response = self.dbm_service.queries().reports().list(queryId=query_id).execute()
+            
+    #        # response = self.dbm_service.queries().reports().list(queryId=query_id).execute()
+        
+    #         # if 'reports' in response:
+    #         #     for report in response['reports']:
+    #         #         print(f"Report ID: {report['key']['reportId']}")
+    #         #         print(f"Report Metadata: {report}")
+
+    #         if not response.get('reports'):
+    #             print("No reports found")
+    #             return None
+
+    #         latest_report = response['reports'][-1]
+    #         if 'metadata' in latest_report and 'googleCloudStoragePath' in latest_report['metadata']:
+    #             url = latest_report['metadata']['googleCloudStoragePath']
+    #             print(f"Downloading report from: {url}")
+    #             df = pd.read_csv(url)
+    #             return df
+                
+    #         print("No report URL found")
+    #         return None
+            
+    #     except Exception as e:
+    #         print(f"Error getting report data: {e}")
+    #         return None
+
+    def get_report_data(self, query_id, max_retries=5, wait_time=30):
+        """
+        Get report data for a given query_id.
+        Retries until the report is available or max_retries is reached.
+        """
         try:
             print("Retrieving report data...")
-            print('Query id in report data->',query_id)
-            response = self.dbm_service.queries().reports().list(queryId=query_id).execute()
-            
-            if not response.get('reports'):
-                print("No reports found")
-                return None
+            print(f"Query ID in report data: {query_id}")
 
-            latest_report = response['reports'][-1]
-            if 'metadata' in latest_report and 'googleCloudStoragePath' in latest_report['metadata']:
-                url = latest_report['metadata']['googleCloudStoragePath']
-                print(f"Downloading report from: {url}")
-                df = pd.read_csv(url)
-                return df
-                
-            print("No report URL found")
+            retries = 0
+
+            while retries < max_retries:
+                try:
+                    # Fetch reports for the given query ID
+                    response = self.dbm_service.queries().reports().list(queryId=query_id).execute()
+                    
+                    if not response.get('reports'):
+                        print("No reports found. Retrying...")
+                        retries += 1
+                        time.sleep(wait_time)
+                        continue
+
+                    # Get the latest report
+                    latest_report = response['reports'][-1]
+                    if 'metadata' in latest_report and 'googleCloudStoragePath' in latest_report['metadata']:
+                        url = latest_report['metadata']['googleCloudStoragePath']
+                        print(f"Downloading report from: {url}")
+                        df = pd.read_csv(url)  # Download and parse the report as a DataFrame
+                        return df
+
+                    print("No report URL found. Retrying...")
+                    retries += 1
+                    time.sleep(wait_time)
+
+                except HttpError as http_err:
+                    print(f"HTTP Error: {http_err}")
+                    retries += 1
+                    time.sleep(wait_time)
+                except Exception as e:
+                    print(f"Error fetching report: {e}")
+                    retries += 1
+                    time.sleep(wait_time)
+
+            print("Max retries reached. Report not available.")
             return None
-            
+
         except Exception as e:
             print(f"Error getting report data: {e}")
             return None
@@ -254,6 +313,20 @@ class DV360DataFetcher:
         except Exception as e:
             print(f"Error updating sheet: {e}")
             return False
+        
+    def fetch_report(self,query_id):
+        query_results = self.dbm_service.queries().get(queryId=query_id).execute()
+        report_url = query_results["metadata"].get("googleCloudStoragePathForLatestReport")
+        if report_url:
+            print(f"Report URL: {report_url}")
+            # Download the file
+            response = requests.get(report_url)
+            with open("campaign_report.csv", "wb") as file:
+                file.write(response.content)
+            print("Report downloaded.")
+        else:
+            print("Report not yet available. Try again later.")
+
 
 def main():
     
@@ -276,22 +349,24 @@ def main():
 
     # Create query
     print("\nCreating DV360 report query...")
-    query_id = fetcher.create_query(ADVERTISER_ID)
-    if not query_id:
-        print("Failed to create query!")
-        return
+    #query_id = fetcher.create_query(ADVERTISER_ID)
+    query_id = '1356166266'
+    # if not query_id:
+    #     print("Failed to create query!")
+    #     return
 
     print(f"\nQuery created successfully with ID: {query_id}")
 
     # Wait for report
     print("\nWaiting for report generation...")
-    if not fetcher.wait_for_report(query_id):
-        print("Report generation failed or timed out!")
-        return
+    # if not fetcher.wait_for_report(query_id):
+    #     print("Report generation failed or timed out!")
+    #     return
 
     # Get report data
     print("\nFetching report data...")
     data = fetcher.get_report_data(query_id)
+    res=fetcher.fetch_report(query_id)
     
 if __name__ == '__main__':
     main()
