@@ -10,6 +10,12 @@ from datetime import datetime
 import pickle
 import requests
 
+from dotenv import load_dotenv
+import os
+
+# Load environment variables from .env file
+load_dotenv()
+
 class DV360DataFetcher:
     def __init__(self, credentials_path):
         self.SCOPES = [
@@ -332,10 +338,10 @@ def main():
     
     print('Creating In main')
     # Configuration
-    CREDENTIALS_PATH = 'client_secret_810072076887-2utceqsi8e6cnr27jd8v8vcd54ec5tnq.apps.googleusercontent.com.json'  # Update with your credentials file path
-    SPREADSHEET_ID = '1eEHlLDG2eSMvQphWjFyvFJ9q1XoyajTs5adrTJzyG4k'  # Update with your spreadsheet ID
-    ADVERTISER_ID = '6783985134'  # Your advertiser ID
-    SHEET_NAME = 'PA DV360'  # Name of the sheet to update
+    CREDENTIALS_PATH = os.getenv('CREDENTIALS_PATH') # Update with your credentials file path
+    SPREADSHEET_ID = os.getenv('SPREADSHEET_ID')  # Update with your spreadsheet ID
+    ADVERTISER_ID = os.getenv('ADVERTISER_ID')  # Your advertiser ID
+    SHEET_NAME = os.getenv('SHEET_NAME')  # Name of the sheet to update
 
     # Initialize fetcher
     fetcher = DV360DataFetcher(CREDENTIALS_PATH)
